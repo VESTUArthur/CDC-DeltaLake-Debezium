@@ -1,0 +1,5 @@
+FROM apache/superset
+USER root
+RUN pip install pyhive
+COPY setup-superset.sh /
+USER superset

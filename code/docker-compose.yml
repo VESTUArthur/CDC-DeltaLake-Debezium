@@ -1,0 +1,104 @@
+version: "3.7"
+services:
+
+  db:
+    build: Database
+    restart: always
+    ports:
+      - 3306:3306
+    networks:
+      - my-network
+
+  phpmyadmin:
+    image: phpmyadmin
+    restart: always
+    ports:
+      - 8181:80
+    environment:
+      - PMA_ARBITRARY=1
+    networks:
+      - my-network
+
+  server:
+    build: Server
+    ports:
+      - 81:80
+    networks:
+      - my-network
+
+  zookeeper:
+    image: docker.io/bitnami/zookeeper:3.8
+    environment:
+      - ALLOW_ANONYMOUS_LOGIN=yes
+    ports:
+     - 2181:2181
+     - 2888:2888
+     - 3888:3888
+    networks:
+      - my-network
+
+
+  kafka:
+    image: docker.io/bitnami/kafka:3.2
+    ports:
+     - 9092:9092
+    links:
+     - zookeeper
+    environment:
+     - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
+     - ALLOW_PLAINTEXT_LISTENER=yes
+    networks:
+      - my-network
+
+  schema-registry:
+    image: docker.io/bitnami/schema-registry:7.3
+    ports:
+      - '8081:8081'
+    depends_on:
+      - kafka
+    environment:
+      - SCHEMA_REGISTRY_LISTENERS=http://0.0.0.0:8081
+      - SCHEMA_REGISTRY_KAFKA_BROKERS=PLAINTEXT://kafka:9092
+    networks:
+      - my-network
+
+  connect:
+    image: quay.io/debezium/connect:2.1
+    ports:
+     - 8083:8083
+    links:
+     - kafka
+     - db
+    environment:
+     - BOOTSTRAP_SERVERS=kafka:9092
+     - GROUP_ID=1
+     - CONFIG_STORAGE_TOPIC=my_connect_configs
+     - OFFSET_STORAGE_TOPIC=my_connect_offsets
+     - STATUS_STORAGE_TOPIC=my_connect_statuses
+    networks:
+      - my-network
+      
+  spark:
+    build: Build
+    stdin_open: true # docker run -i
+    tty: true        # docker run -t
+    ports:
+      - 8080:8080
+      - 9870:9870
+      - 9864:9864
+      - 8088:8088
+      - 9000:9000
+      - 10000:10000
+    networks:
+      - my-network
+     
+  superset:
+    build: BI
+    ports:
+    - 9001:9000
+    - 8085:8088
+    networks:
+    - my-network   
+
+networks:
+  my-network:
